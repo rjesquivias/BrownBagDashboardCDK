@@ -2,9 +2,7 @@ import { Construct } from "constructs";
 import { Deployment, Method, MockIntegration, PassthroughBehavior, RestApi, Stage } from "aws-cdk-lib/aws-apigateway";
 import { aws_cloudwatch as cloudwatch, Duration } from "aws-cdk-lib";
 
-const mockApiName = "mockApiName";
-
-export const createInvocatonCountWidget = () => {
+export const createInvocatonCountWidget = (ApiName: string) => {
   return new cloudwatch.GraphWidget({
     width: 24,
     title: "Invocation Count",
@@ -12,7 +10,7 @@ export const createInvocatonCountWidget = () => {
       new cloudwatch.Metric({
         metricName: "Count",
         namespace: "AWS/ApiGateway",
-        dimensionsMap: { ApiName: mockApiName },
+        dimensionsMap: { ApiName },
         statistic: "sum",
         label: "Count",
         period: Duration.seconds(30),
@@ -21,23 +19,22 @@ export const createInvocatonCountWidget = () => {
   });
 };
 
-export const createLatencyWidget = (title: string, statistic: string, label: string, width: number) => {
+export const createLatencyWidget = (
+  title: string,
+  statistic: string,
+  label: string,
+  width: number,
+  ApiName: string
+) => {
   const duration = Duration.seconds(30);
   const latencyMetric = new cloudwatch.Metric({
     metricName: "Latency",
     namespace: "AWS/ApiGateway",
-    dimensionsMap: { ApiName: mockApiName },
+    dimensionsMap: { ApiName },
     statistic,
     label,
     period: duration,
   });
-  /*
-  const fillExpression = new cloudwatch.MathExpression({
-    expression: "FILL(METRICS(), 0)",
-    usingMetrics: { m1: latencyMetric },
-    period: duration,
-  });
-  */
   return new cloudwatch.GraphWidget({
     width,
     title,
@@ -45,12 +42,12 @@ export const createLatencyWidget = (title: string, statistic: string, label: str
   });
 };
 
-export const create4xxWidget = () => {
+export const create4xxWidget = (ApiName: string) => {
   const duration = Duration.seconds(30);
   const errorMetric = new cloudwatch.Metric({
     metricName: "4XXError",
     namespace: "AWS/ApiGateway",
-    dimensionsMap: { ApiName: mockApiName },
+    dimensionsMap: { ApiName },
     statistic: "Sum",
     label: "4XX Error Count",
     period: duration,
@@ -58,7 +55,7 @@ export const create4xxWidget = () => {
   const errorRate = new cloudwatch.Metric({
     metricName: "4XXError",
     namespace: "AWS/ApiGateway",
-    dimensionsMap: { ApiName: mockApiName },
+    dimensionsMap: { ApiName },
     statistic: "Average",
     label: "4XX Error Rate",
     period: duration,
@@ -70,12 +67,12 @@ export const create4xxWidget = () => {
   });
 };
 
-export const create5xxWidget = () => {
+export const create5xxWidget = (ApiName: string) => {
   const duration = Duration.seconds(30);
   const errorMetric = new cloudwatch.Metric({
     metricName: "5XXError",
     namespace: "AWS/ApiGateway",
-    dimensionsMap: { ApiName: mockApiName },
+    dimensionsMap: { ApiName },
     statistic: "Sum",
     label: "5XX Error Count",
     period: duration,
@@ -83,7 +80,7 @@ export const create5xxWidget = () => {
   const errorRate = new cloudwatch.Metric({
     metricName: "5XXError",
     namespace: "AWS/ApiGateway",
-    dimensionsMap: { ApiName: mockApiName },
+    dimensionsMap: { ApiName },
     statistic: "Average",
     label: "5XX Error Rate",
     period: duration,
@@ -95,8 +92,8 @@ export const create5xxWidget = () => {
   });
 };
 
-export const createRestApi = (scope: Construct) => {
-  const restApi = new RestApi(scope, mockApiName, {
+export const createRestApi = (scope: Construct, ApiName: string) => {
+  const restApi = new RestApi(scope, ApiName, {
     deploy: false,
   });
   restApi.root.addMethod("ANY");
@@ -130,15 +127,35 @@ export const createRestApi = (scope: Construct) => {
   const stage = new Stage(scope, "Stage", { deployment, metricsEnabled: true });
 };
 
-export const createDashboard = (scope: Construct) => {
+export const createDashboard = (scope: Construct, id: string, dashboardName: string) => {
   return new cloudwatch.Dashboard(
     scope,
-    "MyDashboard",
+    id,
     /* all optional props */ {
-      dashboardName: "BrownBagDemoDashboard",
+      dashboardName,
       end: "end",
       periodOverride: cloudwatch.PeriodOverride.AUTO,
       start: "start",
     }
+  );
+};
+
+export const createTeamDashboard = (scope: Construct, apiName: string, dashboardName: string) => {
+  const restApi = createRestApi(scope, apiName);
+  const dashboard = createDashboard(scope, dashboardName, dashboardName);
+  const p90LatencyWidget = createLatencyWidget("P90 - Latency", "p90.00", "P90", 8, apiName);
+  const p95LatencyWidget = createLatencyWidget("P95 - Latency", "p95.00", "P95", 8, apiName);
+  const p99LatencyWidget = createLatencyWidget("P99 - Latency", "p99.00", "P99", 8, apiName);
+  const errorRate4xxWidget = create4xxWidget(apiName);
+  const errorRate5xxWidget = create5xxWidget(apiName);
+  const invocationCountWidget = createInvocatonCountWidget(apiName);
+
+  dashboard.addWidgets(
+    invocationCountWidget,
+    p90LatencyWidget,
+    p95LatencyWidget,
+    p99LatencyWidget,
+    errorRate4xxWidget,
+    errorRate5xxWidget
   );
 };
