@@ -1,16 +1,33 @@
-import * as cdk from 'aws-cdk-lib';
-import { Construct } from 'constructs';
-// import * as sqs from 'aws-cdk-lib/aws-sqs';
+import { App, Stack, StackProps } from "aws-cdk-lib";
+import {
+  create4xxWidget,
+  create5xxWidget,
+  createDashboard,
+  createInvocatonCountWidget,
+  createLatencyWidget,
+  createRestApi,
+} from "./widgetLib";
 
-export class CdkBrownbag2Stack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+export class CdkBrownbag2Stack extends Stack {
+  constructor(scope: App, id: string, props?: StackProps) {
     super(scope, id, props);
 
-    // The code that defines your stack goes here
+    const restApi = createRestApi(this);
+    const dashboard = createDashboard(this);
+    const p90LatencyWidget = createLatencyWidget("P90 Latency", "p90.00", "P90", 8);
+    const p95LatencyWidget = createLatencyWidget("P95 Latency", "p95.00", "P95", 8);
+    const p99LatencyWidget = createLatencyWidget("P99 Latency", "p99.00", "P99", 8);
+    const errorRate4xxWidget = create4xxWidget();
+    const errorRate5xxWidget = create5xxWidget();
+    const invocationCountWidget = createInvocatonCountWidget();
 
-    // example resource
-    // const queue = new sqs.Queue(this, 'CdkBrownbag2Queue', {
-    //   visibilityTimeout: cdk.Duration.seconds(300)
-    // });
+    dashboard.addWidgets(
+      invocationCountWidget,
+      p90LatencyWidget,
+      p95LatencyWidget,
+      p99LatencyWidget,
+      errorRate4xxWidget,
+      errorRate5xxWidget
+    );
   }
 }
